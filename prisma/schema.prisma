@@ -1,0 +1,77 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Block {
+  id        String    @id @default(cuid())
+  name      String    @unique
+  students  Student[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Lesson {
+  id        String    @id @default(cuid())
+  title     String
+  position  Int       @unique
+  subtasks  Subtask[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Subtask {
+  id          String              @id @default(cuid())
+  lessonId    String
+  lesson      Lesson              @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  title       String
+  position    Int
+  completions SubtaskCompletion[]
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+
+  @@unique([lessonId, position])
+}
+
+model Student {
+  id             String              @id @default(cuid())
+  blockId        String
+  block          Block               @relation(fields: [blockId], references: [id], onDelete: Cascade)
+  name           String
+  pinHash        String
+  completions    SubtaskCompletion[]
+  unlockSessions UnlockSession[]
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+
+  @@unique([blockId, name])
+}
+
+model SubtaskCompletion {
+  id          String    @id @default(cuid())
+  studentId   String
+  subtaskId   String
+  completed   Boolean   @default(false)
+  completedAt DateTime?
+  updatedBy   String    @default("student")
+  student     Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subtask     Subtask   @relation(fields: [subtaskId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, subtaskId])
+}
+
+model UnlockSession {
+  id        String   @id @default(cuid())
+  studentId String
+  student   Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  token     String   @unique
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
