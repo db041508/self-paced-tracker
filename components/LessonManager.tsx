@@ -7,10 +7,24 @@ import { pastelForIndex } from "@/lib/pastel";
 const fetcher = (url: string) => fetch(url).then((r) => r.json());
 
 type Subtask = { id: string; title: string; position: number };
-type Lesson = { id: string; title: string; position: number; subtasks: Subtask[] };
+type Lesson = {
+  id: string;
+  title: string;
+  position: number;
+  subtasks: Subtask[];
+  blockIds: string[];
+};
+type BlockOption = { id: string; name: string };
 
-export function LessonManager() {
-  const { data, mutate, isLoading } = useSWR<Lesson[]>("/api/lessons", fetcher);
+export function LessonManager({ teacherId }: { teacherId: string }) {
+  const { data, mutate, isLoading } = useSWR<Lesson[]>(
+    `/api/lessons?teacherId=${teacherId}`,
+    fetcher
+  );
+  const { data: blocks } = useSWR<BlockOption[]>(
+    `/api/blocks?teacherId=${teacherId}`,
+    fetcher
+  );
   const [newTitle, setNewTitle] = useState("");
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
@@ -23,7 +37,7 @@ export function LessonManager() {
     await fetch("/api/lessons", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ teacherId, title }),
     });
     setNewTitle("");
     mutate();
@@ -61,7 +75,7 @@ export function LessonManager() {
       fetch("/api/lessons/reorder", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ orderedIds: ids }),
+        body: JSON.stringify({ teacherId, orderedIds: ids }),
       }).then((r) => r.json()),
       {
         optimisticData: ids.map((id, i) => {
@@ -71,6 +85,13 @@ export function LessonManager() {
         revalidate: false,
       }
     );
+  }
+
+  async function toggleBlock(lessonId: string, blockId: string, included: boolean) {
+    await fetch(`/api/lessons/${lessonId}/blocks/${blockId}`, {
+      method: included ? "POST" : "DELETE",
+    });
+    mutate();
   }
 
   if (isLoading || !data) {
@@ -170,11 +191,37 @@ export function LessonManager() {
               </div>
 
               {isExpanded && (
-                <SubtaskEditor
-                  lessonId={lesson.id}
-                  subtasks={lesson.subtasks}
-                  onChange={() => mutate()}
-                />
+                <>
+                  {blocks && blocks.length > 0 && (
+                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-white/60 pt-3">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+                        Include in:
+                      </span>
+                      {blocks.map((block) => {
+                        const included = lesson.blockIds.includes(block.id);
+                        return (
+                          <label
+                            key={block.id}
+                            className="flex items-center gap-1.5 rounded-full bg-white/70 px-3 py-1 text-sm text-ink"
+                          >
+                            <input
+                              type="checkbox"
+                              checked={included}
+                              onChange={(e) => toggleBlock(lesson.id, block.id, e.target.checked)}
+                              className="h-4 w-4 rounded accent-pastel-mint"
+                            />
+                            {block.name}
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+                  <SubtaskEditor
+                    lessonId={lesson.id}
+                    subtasks={lesson.subtasks}
+                    onChange={() => mutate()}
+                  />
+                </>
               )}
             </div>
           );

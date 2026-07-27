@@ -13,6 +13,7 @@ export async function GET(
   }
 
   const lessons = await prisma.lesson.findMany({
+    where: { blocks: { some: { blockId: id } } },
     orderBy: { position: "asc" },
     include: { subtasks: { orderBy: { position: "asc" } } },
   });

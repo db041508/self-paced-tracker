@@ -8,12 +8,16 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
+  const teacherId = typeof body?.teacherId === "string" ? body.teacherId : "";
   const orderedIds: unknown = body?.orderedIds;
+  if (!teacherId) {
+    return NextResponse.json({ error: "teacherId is required" }, { status: 400 });
+  }
   if (!Array.isArray(orderedIds) || orderedIds.some((id) => typeof id !== "string")) {
     return NextResponse.json({ error: "orderedIds must be a string array" }, { status: 400 });
   }
 
-  const existing = await prisma.lesson.findMany({ select: { id: true } });
+  const existing = await prisma.lesson.findMany({ where: { teacherId }, select: { id: true } });
   const existingIds = new Set(existing.map((l) => l.id));
   const providedIds = new Set(orderedIds as string[]);
 
@@ -37,6 +41,9 @@ export async function POST(request: Request) {
     }
   });
 
-  const lessons = await prisma.lesson.findMany({ orderBy: { position: "asc" } });
+  const lessons = await prisma.lesson.findMany({
+    where: { teacherId },
+    orderBy: { position: "asc" },
+  });
   return NextResponse.json(lessons);
 }

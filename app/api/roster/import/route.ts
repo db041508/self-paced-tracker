@@ -6,6 +6,7 @@ import { generatePin, hashPin, isValidPinFormat } from "@/lib/pin";
 type InputRow = {
   rowNumber: number;
   name: string;
+  teacher: string;
   block: string;
   pin?: string;
 };
@@ -22,7 +23,7 @@ export async function POST(request: Request) {
   }
 
   const errors: { row: number; reason: string }[] = [];
-  const generatedPins: { name: string; block: string; pin: string }[] = [];
+  const generatedPins: { name: string; teacher: string; block: string; pin: string }[] = [];
   let createdCount = 0;
   let updatedCount = 0;
   let skippedCount = 0;
@@ -33,11 +34,16 @@ export async function POST(request: Request) {
   for (const raw of rows as Record<string, unknown>[]) {
     const rowNumber = typeof raw?.rowNumber === "number" ? raw.rowNumber : validRows.length + 1;
     const name = typeof raw?.name === "string" ? raw.name.trim() : "";
+    const teacher = typeof raw?.teacher === "string" ? raw.teacher.trim() : "";
     const block = typeof raw?.block === "string" ? raw.block.trim() : "";
     const pin = typeof raw?.pin === "string" ? raw.pin.trim() : "";
 
     if (!name) {
       errors.push({ row: rowNumber, reason: "Missing name" });
+      continue;
+    }
+    if (!teacher) {
+      errors.push({ row: rowNumber, reason: "Missing teacher" });
       continue;
     }
     if (!block) {
@@ -49,28 +55,42 @@ export async function POST(request: Request) {
       continue;
     }
 
-    const identity = `${block.toLowerCase()}::${name.toLowerCase()}`;
+    const identity = `${teacher.toLowerCase()}::${block.toLowerCase()}::${name.toLowerCase()}`;
     if (seenInFile.has(identity)) {
       errors.push({ row: rowNumber, reason: "Duplicate row in file" });
       continue;
     }
     seenInFile.add(identity);
 
-    validRows.push({ rowNumber, name, block, pin: pin || undefined });
+    validRows.push({ rowNumber, name, teacher, block, pin: pin || undefined });
+  }
+
+  const teacherCache = new Map<string, { id: string; name: string }>();
+  for (const t of await prisma.teacher.findMany()) {
+    teacherCache.set(t.name.toLowerCase(), { id: t.id, name: t.name });
   }
 
   const blockCache = new Map<string, { id: string; name: string }>();
-  const existingBlocks = await prisma.block.findMany();
-  for (const b of existingBlocks) {
-    blockCache.set(b.name.toLowerCase(), { id: b.id, name: b.name });
+  for (const b of await prisma.block.findMany()) {
+    blockCache.set(`${b.teacherId}::${b.name.toLowerCase()}`, { id: b.id, name: b.name });
   }
 
   for (const row of validRows) {
-    let block = blockCache.get(row.block.toLowerCase());
+    let teacher = teacherCache.get(row.teacher.toLowerCase());
+    if (!teacher) {
+      const created = await prisma.teacher.create({ data: { name: row.teacher } });
+      teacher = { id: created.id, name: created.name };
+      teacherCache.set(row.teacher.toLowerCase(), teacher);
+    }
+
+    const blockKey = `${teacher.id}::${row.block.toLowerCase()}`;
+    let block = blockCache.get(blockKey);
     if (!block) {
-      const created = await prisma.block.create({ data: { name: row.block } });
+      const created = await prisma.block.create({
+        data: { teacherId: teacher.id, name: row.block },
+      });
       block = { id: created.id, name: created.name };
-      blockCache.set(row.block.toLowerCase(), block);
+      blockCache.set(blockKey, block);
     }
 
     const existingStudent = await prisma.student.findFirst({
@@ -96,7 +116,7 @@ export async function POST(request: Request) {
     });
     createdCount++;
     if (!row.pin) {
-      generatedPins.push({ name: row.name, block: block.name, pin });
+      generatedPins.push({ name: row.name, teacher: teacher.name, block: block.name, pin });
     }
   }
 

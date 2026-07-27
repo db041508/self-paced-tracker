@@ -3,12 +3,31 @@ import { prisma } from "@/lib/db";
 import { isTeacher } from "@/lib/auth";
 import { DEFAULT_SUBTASK_TITLES } from "@/lib/constants";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const teacherId = searchParams.get("teacherId");
+  if (!teacherId) {
+    return NextResponse.json({ error: "teacherId is required" }, { status: 400 });
+  }
+
   const lessons = await prisma.lesson.findMany({
+    where: { teacherId },
     orderBy: { position: "asc" },
-    include: { subtasks: { orderBy: { position: "asc" } } },
+    include: {
+      subtasks: { orderBy: { position: "asc" } },
+      blocks: { select: { blockId: true } },
+    },
   });
-  return NextResponse.json(lessons);
+
+  return NextResponse.json(
+    lessons.map((lesson) => ({
+      id: lesson.id,
+      title: lesson.title,
+      position: lesson.position,
+      subtasks: lesson.subtasks,
+      blockIds: lesson.blocks.map((b) => b.blockId),
+    }))
+  );
 }
 
 export async function POST(request: Request) {
@@ -17,14 +36,21 @@ export async function POST(request: Request) {
   }
 
   const body = await request.json().catch(() => null);
+  const teacherId = typeof body?.teacherId === "string" ? body.teacherId : "";
   const title = typeof body?.title === "string" ? body.title.trim() : "";
-  if (!title) {
-    return NextResponse.json({ error: "Title is required" }, { status: 400 });
+  if (!teacherId || !title) {
+    return NextResponse.json({ error: "teacherId and title are required" }, { status: 400 });
   }
 
-  const count = await prisma.lesson.count();
+  const teacher = await prisma.teacher.findUnique({ where: { id: teacherId } });
+  if (!teacher) {
+    return NextResponse.json({ error: "Teacher not found" }, { status: 404 });
+  }
+
+  const count = await prisma.lesson.count({ where: { teacherId } });
   const lesson = await prisma.lesson.create({
     data: {
+      teacherId,
       title,
       position: count,
       subtasks: {
@@ -37,5 +63,5 @@ export async function POST(request: Request) {
     include: { subtasks: { orderBy: { position: "asc" } } },
   });
 
-  return NextResponse.json(lesson, { status: 201 });
+  return NextResponse.json({ ...lesson, blockIds: [] }, { status: 201 });
 }

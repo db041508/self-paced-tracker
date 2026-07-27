@@ -10,21 +10,50 @@ datasource db {
   provider = "postgresql"
 }
 
+model Teacher {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  blocks    Block[]
+  lessons   Lesson[]
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 model Block {
-  id        String    @id @default(cuid())
-  name      String    @unique
+  id        String        @id @default(cuid())
+  teacherId String
+  teacher   Teacher       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  name      String
   students  Student[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  lessons   LessonBlock[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([teacherId, name])
 }
 
 model Lesson {
-  id        String    @id @default(cuid())
+  id        String        @id @default(cuid())
+  teacherId String
+  teacher   Teacher       @relation(fields: [teacherId], references: [id], onDelete: Cascade)
   title     String
-  position  Int       @unique
+  position  Int
   subtasks  Subtask[]
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  blocks    LessonBlock[]
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+
+  @@unique([teacherId, position])
+}
+
+model LessonBlock {
+  id       String @id @default(cuid())
+  lessonId String
+  lesson   Lesson @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  blockId  String
+  block    Block  @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  @@unique([lessonId, blockId])
 }
 
 model Subtask {

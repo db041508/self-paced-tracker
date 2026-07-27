@@ -42,7 +42,7 @@ export async function DELETE(
   await prisma.$transaction(async (tx) => {
     await tx.lesson.delete({ where: { id } });
     await tx.lesson.updateMany({
-      where: { position: { gt: lesson.position } },
+      where: { teacherId: lesson.teacherId, position: { gt: lesson.position } },
       data: { position: { decrement: 1 } },
     });
   });

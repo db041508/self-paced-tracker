@@ -5,9 +5,9 @@ import { pastelForIndex } from "@/lib/pastel";
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
-  const blocks = await prisma.block.findMany({
+  const teachers = await prisma.teacher.findMany({
     orderBy: { name: "asc" },
-    include: { _count: { select: { students: true } } },
+    include: { _count: { select: { blocks: true } } },
   });
 
   return (
@@ -23,10 +23,9 @@ export default async function Home() {
           </Link>
         </div>
 
-        {blocks.length === 0 ? (
+        {teachers.length === 0 ? (
           <p className="text-ink-soft">
-            No blocks have been set up yet. A teacher needs to add one from
-            the{" "}
+            No teachers have been set up yet. Add one from the{" "}
             <Link href="/teacher" className="underline">
               teacher view
             </Link>
@@ -34,20 +33,20 @@ export default async function Home() {
           </p>
         ) : (
           <>
-            <p className="mb-6 text-ink-soft">Pick your block to see the class progress.</p>
+            <p className="mb-6 text-ink-soft">Pick your teacher to see their classes.</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {blocks.map((block, i) => {
+              {teachers.map((teacher, i) => {
                 const palette = pastelForIndex(i);
                 return (
                   <Link
-                    key={block.id}
-                    href={`/grid/${block.id}`}
+                    key={teacher.id}
+                    href={`/teachers/${teacher.id}`}
                     className={`flex min-h-24 flex-col justify-center rounded-3xl border-2 ${palette.border} ${palette.bg} px-6 py-5 shadow-sm transition hover:shadow-md`}
                   >
-                    <span className="text-xl font-semibold text-ink">{block.name}</span>
+                    <span className="text-xl font-semibold text-ink">{teacher.name}</span>
                     <span className="text-sm text-ink-soft">
-                      {block._count.students} student
-                      {block._count.students === 1 ? "" : "s"}
+                      {teacher._count.blocks} period
+                      {teacher._count.blocks === 1 ? "" : "s"}
                     </span>
                   </Link>
                 );

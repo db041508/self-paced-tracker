@@ -6,6 +6,7 @@ import Papa from "papaparse";
 type PreviewRow = {
   rowNumber: number;
   name: string;
+  teacher: string;
   block: string;
   pin?: string;
   valid: boolean;
@@ -17,7 +18,7 @@ type ImportResult = {
   updatedCount: number;
   skippedCount: number;
   errors: { row: number; reason: string }[];
-  generatedPins: { name: string; block: string; pin: string }[];
+  generatedPins: { name: string; teacher: string; block: string; pin: string }[];
 };
 
 const PIN_RE = /^\d{4}$/;
@@ -36,22 +37,26 @@ function buildPreview(records: Record<string, string>[]): PreviewRow[] {
   return records.map((record, index) => {
     const rowNumber = index + 2; // account for header row
     const name = pickField(record, ["name"]);
+    const teacher = pickField(record, ["teacher"]);
     const block = pickField(record, ["block"]);
     const pin = pickField(record, ["pin"]);
 
-    if (!name) return { rowNumber, name, block, pin, valid: false, reason: "Missing name" };
-    if (!block) return { rowNumber, name, block, pin, valid: false, reason: "Missing block" };
+    if (!name) return { rowNumber, name, teacher, block, pin, valid: false, reason: "Missing name" };
+    if (!teacher) {
+      return { rowNumber, name, teacher, block, pin, valid: false, reason: "Missing teacher" };
+    }
+    if (!block) return { rowNumber, name, teacher, block, pin, valid: false, reason: "Missing block" };
     if (pin && !PIN_RE.test(pin)) {
-      return { rowNumber, name, block, pin, valid: false, reason: "PIN must be 4 digits" };
+      return { rowNumber, name, teacher, block, pin, valid: false, reason: "PIN must be 4 digits" };
     }
 
-    const identity = `${block.toLowerCase()}::${name.toLowerCase()}`;
+    const identity = `${teacher.toLowerCase()}::${block.toLowerCase()}::${name.toLowerCase()}`;
     if (seen.has(identity)) {
-      return { rowNumber, name, block, pin, valid: false, reason: "Duplicate row in file" };
+      return { rowNumber, name, teacher, block, pin, valid: false, reason: "Duplicate row in file" };
     }
     seen.add(identity);
 
-    return { rowNumber, name, block, pin: pin || undefined, valid: true };
+    return { rowNumber, name, teacher, block, pin: pin || undefined, valid: true };
   });
 }
 
@@ -108,10 +113,10 @@ export function CsvImportForm() {
       <div className="mb-6 rounded-2xl border-2 border-cream-soft bg-white p-4 text-sm text-ink-soft">
         <p className="mb-1 font-semibold text-ink">CSV format</p>
         <p>
-          Columns (any order, case-insensitive): <code>name</code>, <code>block</code>,{" "}
-          <code>pin</code> (optional). If a PIN is left blank, one will be generated for you.
-          Re-uploading the same file is safe — existing students without a PIN in the row are
-          left untouched.
+          Columns (any order, case-insensitive): <code>name</code>, <code>teacher</code>,{" "}
+          <code>block</code>, <code>pin</code> (optional). New teachers and periods are created
+          automatically. If a PIN is left blank, one will be generated for you. Re-uploading the
+          same file is safe — existing students without a PIN in the row are left untouched.
         </p>
       </div>
 
@@ -136,6 +141,7 @@ export function CsvImportForm() {
                 <tr className="bg-cream-soft">
                   <th className="px-3 py-2 text-left">Row</th>
                   <th className="px-3 py-2 text-left">Name</th>
+                  <th className="px-3 py-2 text-left">Teacher</th>
                   <th className="px-3 py-2 text-left">Block</th>
                   <th className="px-3 py-2 text-left">PIN</th>
                   <th className="px-3 py-2 text-left">Status</th>
@@ -146,6 +152,7 @@ export function CsvImportForm() {
                   <tr key={row.rowNumber} className={row.valid ? "" : "bg-pastel-pink-bg"}>
                     <td className="px-3 py-2 text-ink-soft">{row.rowNumber}</td>
                     <td className="px-3 py-2">{row.name || "—"}</td>
+                    <td className="px-3 py-2">{row.teacher || "—"}</td>
                     <td className="px-3 py-2">{row.block || "—"}</td>
                     <td className="px-3 py-2">{row.pin || "auto"}</td>
                     <td className="px-3 py-2">
@@ -187,14 +194,16 @@ export function CsvImportForm() {
                   <thead>
                     <tr className="bg-cream-soft">
                       <th className="px-3 py-2 text-left">Name</th>
+                      <th className="px-3 py-2 text-left">Teacher</th>
                       <th className="px-3 py-2 text-left">Block</th>
                       <th className="px-3 py-2 text-left">PIN</th>
                     </tr>
                   </thead>
                   <tbody>
                     {result.generatedPins.map((p) => (
-                      <tr key={`${p.block}-${p.name}`}>
+                      <tr key={`${p.teacher}-${p.block}-${p.name}`}>
                         <td className="px-3 py-2">{p.name}</td>
+                        <td className="px-3 py-2">{p.teacher}</td>
                         <td className="px-3 py-2">{p.block}</td>
                         <td className="px-3 py-2 font-semibold text-pastel-mint">{p.pin}</td>
                       </tr>

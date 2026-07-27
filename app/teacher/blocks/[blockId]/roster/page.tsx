@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTeacherPage } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -13,14 +14,22 @@ export default async function TeacherRosterPage({
 }) {
   await requireTeacherPage();
   const { blockId } = await params;
-  const block = await prisma.block.findUnique({ where: { id: blockId } });
+  const block = await prisma.block.findUnique({ where: { id: blockId }, include: { teacher: true } });
   if (!block) notFound();
 
   return (
     <div className="flex flex-1 flex-col bg-cream px-4 py-6 sm:px-8">
       <div className="mx-auto w-full max-w-3xl">
         <TeacherNav />
-        <h1 className="mb-6 text-2xl font-bold text-ink">{block.name} — Roster</h1>
+        <Link
+          href={`/teacher/blocks/${blockId}`}
+          className="mb-2 inline-block text-sm text-ink-soft hover:underline"
+        >
+          ← {block.name}
+        </Link>
+        <h1 className="mb-6 text-2xl font-bold text-ink">
+          {block.teacher.name} — {block.name} — Roster
+        </h1>
         <RosterManager blockId={blockId} />
       </div>
     </div>
